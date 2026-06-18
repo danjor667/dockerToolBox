@@ -1,0 +1,49 @@
+# Build output
+/dockertoolbox
+/bin/
+/dist/
+
+
+dockerToolBox.md
+
+# Go
+*.test
+*.out
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# Test & coverage artifacts
+*.cover
+coverage.*
+profile.out
+# Go workspace files
+go.work
+go.work.sum
+# Dependency vendoring (uncomment if not vendoring)
+# /vendor/
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# Local environment / secrets
+.env
+.env.local
+*.local

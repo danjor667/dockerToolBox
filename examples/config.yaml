@@ -1,0 +1,22 @@
+# Example DockerToolBox user config.
+# Copy to ~/.docker-toolbox/config.yaml to enable these commands.
+#
+# In v0.1, custom steps run as external shell commands and therefore
+# require the global --allow-shell flag, e.g.:
+#
+#     dockertoolbox deploy-dev --allow-shell
+#     dockertoolbox deploy-dev --dry-run     # preview, no --allow-shell needed
+#
+# A step may be a plain string or an explicit shell step:
+#
+#     steps:
+#       - docker compose up -d            # scalar form
+#       - shell: "docker compose logs -f" # explicit shell form
+
+commands:
+  deploy-dev:
+    description: Deploy development environment
+    steps:
+      - docker compose down
+      - docker compose pull
+      - docker compose up -d
