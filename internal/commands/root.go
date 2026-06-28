@@ -44,6 +44,7 @@ func init() {
 		newContainerCmd(),
 		newImageCmd(),
 		newVolumeCmd(),
+		newNetworkCmd(),
 		newSystemCmd(),
 	)
 }

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -44,10 +45,11 @@ func (c *Client) Ping(ctx context.Context) error {
 
 // Container is a trimmed view of a Docker container.
 type Container struct {
-	ID    string
-	Name  string
-	State string
-	Image string
+	ID     string
+	Name   string
+	State  string
+	Image  string
+	Labels map[string]string
 }
 
 // Running reports whether the container is currently running.
@@ -66,7 +68,7 @@ func (c *Client) ListContainers(ctx context.Context, all bool) ([]Container, err
 		if len(ct.Names) > 0 {
 			name = strings.TrimPrefix(ct.Names[0], "/")
 		}
-		out = append(out, Container{ID: ct.ID, Name: name, State: ct.State, Image: ct.Image})
+		out = append(out, Container{ID: ct.ID, Name: name, State: ct.State, Image: ct.Image, Labels: ct.Labels})
 	}
 	return out, nil
 }
@@ -84,9 +86,10 @@ func (c *Client) RemoveContainer(ctx context.Context, id string, force bool) err
 
 // Image is a trimmed view of a Docker image.
 type Image struct {
-	ID   string
-	Tags []string
-	Size int64
+	ID     string
+	Tags   []string
+	Size   int64
+	Labels map[string]string
 }
 
 // ListImages returns the top-level images.
@@ -97,7 +100,7 @@ func (c *Client) ListImages(ctx context.Context) ([]Image, error) {
 	}
 	out := make([]Image, 0, len(list))
 	for _, im := range list {
-		out = append(out, Image{ID: im.ID, Tags: im.RepoTags, Size: im.Size})
+		out = append(out, Image{ID: im.ID, Tags: im.RepoTags, Size: im.Size, Labels: im.Labels})
 	}
 	return out, nil
 }
@@ -117,17 +120,69 @@ func (c *Client) PruneImages(ctx context.Context) (uint64, error) {
 	return report.SpaceReclaimed, nil
 }
 
-// ListVolumes returns volume names.
-func (c *Client) ListVolumes(ctx context.Context) ([]string, error) {
+// Volume is a trimmed view of a Docker volume.
+type Volume struct {
+	Name   string
+	Labels map[string]string
+}
+
+// ListVolumes returns volumes.
+func (c *Client) ListVolumes(ctx context.Context) ([]Volume, error) {
 	resp, err := c.api.VolumeList(ctx, volume.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
-	out := make([]string, 0, len(resp.Volumes))
+	out := make([]Volume, 0, len(resp.Volumes))
 	for _, v := range resp.Volumes {
-		out = append(out, v.Name)
+		out = append(out, Volume{Name: v.Name, Labels: v.Labels})
 	}
 	return out, nil
+}
+
+// PruneContainers removes stopped containers and returns the removed IDs
+// and the number of bytes reclaimed.
+func (c *Client) PruneContainers(ctx context.Context) ([]string, uint64, error) {
+	report, err := c.api.ContainersPrune(ctx, filters.NewArgs())
+	if err != nil {
+		return nil, 0, err
+	}
+	return report.ContainersDeleted, report.SpaceReclaimed, nil
+}
+
+// DiskUsageSummary is a high-level breakdown of Docker disk usage.
+type DiskUsageSummary struct {
+	Images         int
+	ImagesSize     int64
+	Containers     int
+	Volumes        int
+	VolumesSize    int64
+	BuildCache     int
+	BuildCacheSize int64
+}
+
+// DiskUsage reports how much disk space Docker is using.
+func (c *Client) DiskUsage(ctx context.Context) (DiskUsageSummary, error) {
+	du, err := c.api.DiskUsage(ctx, types.DiskUsageOptions{})
+	if err != nil {
+		return DiskUsageSummary{}, err
+	}
+	var s DiskUsageSummary
+	s.Images = len(du.Images)
+	for _, im := range du.Images {
+		s.ImagesSize += im.Size
+	}
+	s.Containers = len(du.Containers)
+	s.Volumes = len(du.Volumes)
+	for _, v := range du.Volumes {
+		if v.UsageData != nil && v.UsageData.Size > 0 {
+			s.VolumesSize += v.UsageData.Size
+		}
+	}
+	s.BuildCache = len(du.BuildCache)
+	for _, bc := range du.BuildCache {
+		s.BuildCacheSize += bc.Size
+	}
+	return s, nil
 }
 
 // PruneVolumes removes unused volumes and returns bytes reclaimed.
@@ -146,6 +201,7 @@ type Overview struct {
 	ContainersTotal   int
 	Images            int
 	Volumes           int
+	Networks          int
 }
 
 // Overview gathers a high-level summary of the Docker environment.
@@ -172,11 +228,16 @@ func (c *Client) Overview(ctx context.Context) (Overview, error) {
 	if err != nil {
 		return Overview{}, err
 	}
+	nets, err := c.ListNetworks(ctx)
+	if err != nil {
+		return Overview{}, err
+	}
 	return Overview{
 		ServerVersion:     info.ServerVersion,
 		ContainersRunning: running,
 		ContainersTotal:   len(all),
 		Images:            len(imgs),
 		Volumes:           len(vols),
+		Networks:          len(nets),
 	}, nil
 }

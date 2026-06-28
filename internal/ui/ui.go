@@ -9,6 +9,8 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strings"
+	"text/tabwriter"
 )
 
 const (
@@ -67,4 +69,15 @@ func Infof(format string, a ...any) {
 // dry-run "would" lines.
 func Step(format string, a ...any) {
 	fmt.Println(colorize(gray, "  • ") + render(format, a))
+}
+
+// Table prints rows in aligned columns under the given headers. Cells are
+// left uncolored so ANSI codes never throw off column widths.
+func Table(headers []string, rows [][]string) {
+	w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+	fmt.Fprintln(w, strings.Join(headers, "\t"))
+	for _, r := range rows {
+		fmt.Fprintln(w, strings.Join(r, "\t"))
+	}
+	_ = w.Flush()
 }

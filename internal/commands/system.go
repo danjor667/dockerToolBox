@@ -15,12 +15,100 @@ func newSystemCmd() *cobra.Command {
 		Use:   "system",
 		Short: "System-wide operations",
 	}
-	cmd.AddCommand(&cobra.Command{
+
+	reset := &cobra.Command{
 		Use:   "reset",
 		Short: "Stop and remove all containers and images, and prune unused volumes",
 		RunE:  func(_ *cobra.Command, _ []string) error { return systemReset() },
-	})
+	}
+
+	prune := &cobra.Command{
+		Use:   "prune",
+		Short: "Remove unused data: stopped containers, unused networks, and dangling images",
+		RunE: func(c *cobra.Command, _ []string) error {
+			withVolumes, _ := c.Flags().GetBool("volumes")
+			return systemPrune(withVolumes)
+		},
+	}
+	prune.Flags().Bool("volumes", false, "also prune unused volumes")
+
+	df := &cobra.Command{
+		Use:   "df",
+		Short: "Show Docker disk usage",
+		RunE:  func(_ *cobra.Command, _ []string) error { return systemDF() },
+	}
+
+	cmd.AddCommand(reset, prune, df)
 	return cmd
+}
+
+// systemPrune removes unused data. Unlike reset, it only touches
+// resources Docker considers unused (stopped containers, unused networks,
+// dangling images, and optionally unused volumes).
+func systemPrune(withVolumes bool) error {
+	return withEngine(func(ctx context.Context, eng *engine.Client) error {
+		scope := "stopped containers, unused networks, and dangling images"
+		if withVolumes {
+			scope += ", and unused volumes"
+		}
+		if flagDryRun {
+			ui.Infof("dry-run: would prune %s", scope)
+			return nil
+		}
+		if !flagYes {
+			ok, err := prompt(fmt.Sprintf("Prune %s?", scope))
+			if err != nil || !ok {
+				return err
+			}
+		}
+
+		cids, csize, err := eng.PruneContainers(ctx)
+		if err != nil {
+			return err
+		}
+		ui.Success("removed %d stopped container(s), reclaimed %s", len(cids), humanSize(csize))
+
+		nets, err := eng.PruneNetworks(ctx)
+		if err != nil {
+			return err
+		}
+		ui.Success("removed %d unused network(s)", len(nets))
+
+		isize, err := eng.PruneImages(ctx)
+		if err != nil {
+			return err
+		}
+		ui.Success("pruned dangling images, reclaimed %s", humanSize(isize))
+
+		if withVolumes {
+			vsize, err := eng.PruneVolumes(ctx)
+			if err != nil {
+				return err
+			}
+			ui.Success("pruned unused volumes, reclaimed %s", humanSize(vsize))
+		}
+		return nil
+	})
+}
+
+func systemDF() error {
+	return withEngine(func(ctx context.Context, eng *engine.Client) error {
+		du, err := eng.DiskUsage(ctx)
+		if err != nil {
+			return err
+		}
+		ui.Header("Docker Disk Usage")
+		ui.Table(
+			[]string{"TYPE", "ITEMS", "SIZE"},
+			[][]string{
+				{"Images", fmt.Sprint(du.Images), humanSizeI(du.ImagesSize)},
+				{"Containers", fmt.Sprint(du.Containers), "-"},
+				{"Volumes", fmt.Sprint(du.Volumes), humanSizeI(du.VolumesSize)},
+				{"Build cache", fmt.Sprint(du.BuildCache), humanSizeI(du.BuildCacheSize)},
+			},
+		)
+		return nil
+	})
 }
 
 // systemReset is the most destructive command. It summarizes everything

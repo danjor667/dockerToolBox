@@ -47,6 +47,22 @@ func imageLabels(ims []engine.Image) []string {
 	return out
 }
 
+// nameOr returns name, or "-" when it is empty (for table cells).
+func nameOr(name string) string {
+	if name == "" {
+		return "-"
+	}
+	return name
+}
+
+// humanSizeI formats a signed byte count, treating negatives as zero.
+func humanSizeI(b int64) string {
+	if b < 0 {
+		b = 0
+	}
+	return humanSize(uint64(b))
+}
+
 // humanSize formats a byte count as a human-readable string.
 func humanSize(b uint64) string {
 	const unit = 1024

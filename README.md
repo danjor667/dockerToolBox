@@ -124,16 +124,47 @@ docker daemon unreachable (is Docker running?): ...
 
 | Command                          | Description                                              |
 | -------------------------------- | -------------------------------------------------------- |
-| `dockertoolbox overview`         | Show daemon version and container/image/volume counts.   |
+| `dockertoolbox overview`         | Show daemon version and resource counts.                 |
+| `dockertoolbox container ls`     | List containers.                                         |
 | `dockertoolbox container stop-all`   | Stop all running containers.                         |
 | `dockertoolbox container rm-all`     | Remove all containers (running and stopped).         |
 | `dockertoolbox container rm-stopped` | Remove only stopped containers.                      |
+| `dockertoolbox image ls`         | List images.                                             |
 | `dockertoolbox image rm-all`     | Remove all images.                                       |
 | `dockertoolbox image clean`      | Prune dangling images.                                   |
+| `dockertoolbox volume ls`        | List volumes.                                            |
 | `dockertoolbox volume clean`     | Prune unused volumes.                                    |
+| `dockertoolbox network ls`       | List networks.                                           |
+| `dockertoolbox network clean`    | Prune unused networks.                                   |
+| `dockertoolbox system df`        | Show Docker disk usage.                                  |
+| `dockertoolbox system prune`     | Remove unused data (`--volumes` to also prune volumes).  |
 | `dockertoolbox system reset`     | Remove all containers and images, then prune volumes.    |
 
 Run `dockertoolbox <command> --help` for details on any command.
+
+### Selectors (`--name` / `--label`)
+
+The listing and bulk container/image commands accept selectors so you can act
+on a subset instead of all-or-nothing:
+
+| Flag             | Semantics                                                            |
+| ---------------- | ------------------------------------------------------------------- |
+| `--name <text>`  | Match resources whose name/tag **contains** `<text>`. Repeatable; multiple values are **OR**'d. |
+| `--label <l>`    | Match resources carrying label `<l>` (`key` or `key=value`). Repeatable; multiple values are **AND**'d. |
+
+```bash
+# List only containers whose name contains "web"
+dockertoolbox container ls --name web
+
+# Remove containers labeled env=dev (with confirmation)
+dockertoolbox container rm-all --label env=dev
+
+# Combine: name contains "api" AND label tier=backend
+dockertoolbox container ls --name api --label tier=backend
+```
+
+Selectors compose with `--dry-run` and `--yes`, so you can preview exactly
+which resources a bulk command would affect.
 
 ## Global flags & safety model
 
@@ -280,9 +311,9 @@ keeps output to plain ANSI so the binary stays lean.
 
 | Version | Focus |
 | ------- | ----- |
-| **0.1** *(current)* | Standalone CLI, Docker API connection, built-in commands, global safety flags, custom commands |
-| **0.2** | Broader cleanup/management commands; Docker CLI plugin entry point (`docker toolbox …`) |
-| **0.3** | SDK-native custom-command verbs (no `--allow-shell` needed); variables and hooks in workflows |
+| **0.1** | Standalone CLI, Docker API connection, built-in commands, global safety flags, custom commands |
+| **0.2** *(current)* | Resource listing (`ls`), network commands, `system prune`/`system df`, and `--name`/`--label` selectors |
+| **0.3** | Docker CLI plugin entry point (`docker toolbox …`); SDK-native custom-command verbs; variables and hooks |
 | **0.4** | Interactive terminal UI (Bubble Tea / Lip Gloss) |
 | **1.0** | Plugin ecosystem |
 

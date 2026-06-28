@@ -24,6 +24,7 @@ func newOverviewCmd() *cobra.Command {
 				ui.Infof("Containers     : %d running / %d total", ov.ContainersRunning, ov.ContainersTotal)
 				ui.Infof("Images         : %d", ov.Images)
 				ui.Infof("Volumes        : %d", ov.Volumes)
+				ui.Infof("Networks       : %d", ov.Networks)
 				return nil
 			})
 		},
