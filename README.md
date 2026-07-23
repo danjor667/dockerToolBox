@@ -346,11 +346,11 @@ keeps output to plain ANSI so the binary stays lean.
 
 ## Roadmap
 
-| Version | Focus |
-| ------- | ----- |
-| **0.1** | Standalone CLI, Docker API connection, built-in commands, global safety flags, custom commands |
-| **0.2** | Resource listing (`ls`), network commands, `system prune`/`system df`, and `--name`/`--label` selectors |
+| Version | Focus                                                                                                                                                                                                           |
+| ------- |-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **0.1** | Standalone CLI, Docker API connection, built-in commands, global safety flags, custom commands                                                                                                                  |
+| **0.2** | Resource listing (`ls`), network commands, `system prune`/`system df`, and `--name`/`--label` selectors                                                                                                         |
 | **0.3** *(current)* | Docker CLI plugin entry point (`docker toolbox …`); SDK-native custom-command verbs; signal-aware cancellation; `engine.API` seam + fake for testable command logic. *(Variables and hooks deferred to 0.3.x.)* |
-| **0.4** | Interactive terminal UI (Bubble Tea / Lip Gloss) |
-| **1.0** | Plugin ecosystem |
+| **0.4** | Interactive terminal UI (Bubble Tea / Lip Gloss)                                                                                                                                                                |
+| **1.0** | Plugin ecosystem next                                                                                                                                                                                           |
 
