@@ -1,8 +1,6 @@
 package commands
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 
 	"dockerToolBox/internal/config"
@@ -34,11 +32,13 @@ func newCustomCmd(name string, cc config.CustomCommand) *cobra.Command {
 	return &cobra.Command{
 		Use:   name,
 		Short: cc.Description,
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(c *cobra.Command, _ []string) error {
 			ui.Header("Custom command: %s", name)
-			return executor.Run(context.Background(), cc, executor.Options{
+			return executor.Run(c.Context(), cc, executor.Options{
 				DryRun:     flagDryRun,
+				Yes:        flagYes,
 				AllowShell: flagAllowShell,
+				Engine:     newEngine, // lazily connected; only used by native verbs
 			})
 		},
 	}

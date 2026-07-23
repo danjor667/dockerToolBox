@@ -97,6 +97,19 @@ export PATH="$PATH:$(go env GOPATH)/bin"   # add to ~/.zshrc or ~/.bashrc
 > still see `command not found`, run `hash -r` (or open a new tab) to refresh
 > zsh's command cache.
 
+### As a Docker CLI plugin (`docker toolbox …`)
+
+DockerToolBox also runs as a Docker CLI plugin. Build the binary named
+`docker-toolbox` and drop it in Docker's plugin directory:
+
+```bash
+go build -o ~/.docker/cli-plugins/docker-toolbox ./cmd/dockertoolbox
+docker toolbox overview            # same command tree, under `docker`
+```
+
+The standalone binary and the plugin are the same executable; the plugin form
+just makes the commands available as `docker toolbox …`.
+
 
 ## Quick start
 
@@ -210,29 +223,44 @@ dockertoolbox deploy-dev --allow-shell  # actually run them
 
 ### Step forms
 
-A step may be a plain string or an explicit shell step:
+A step may be a plain string (scalar) or an explicit shell step:
 
 ```yaml
 steps:
-  - docker compose up -d              # scalar form
+  - container rm-all                  # scalar form
   - shell: "docker compose logs -f"   # explicit shell form
 ```
 
+### Native verbs vs. shell steps
+
+As of v0.3, a scalar step is resolved one of two ways:
+
+- **Native verb** — if the step names a built-in operation (e.g.
+  `container rm-all`, `image clean`, `system prune`), it runs **through the
+  Docker engine directly**: no shell, no `--allow-shell`. It follows the same
+  list → confirm → act safety flow as the equivalent CLI command and honors
+  `--dry-run` / `--yes`. Verb names mirror the CLI command paths exactly.
+- **Shell command** — any other scalar (or any `shell:` step) runs as an
+  external shell command and is subject to the shell-safety rules below.
+
+Supported verbs: `overview`, `container ls|stop-all|rm-all|rm-stopped`,
+`image ls|rm-all|clean`, `volume ls|clean`, `network ls|clean`,
+`system prune|prune --volumes|df|reset`.
+
 ### Execution & safety
 
-In v0.1, custom steps run as **external shell commands**, which is a security
-consideration. Accordingly:
+Shell steps run as **external commands**, which is a security consideration.
+Accordingly:
 
-- Steps require the global `--allow-shell` flag. Without it, the command is
-  refused with a clear message.
+- Shell steps require the global `--allow-shell` flag. Without it, the command
+  is refused with a clear message. (Native verbs do **not** need it.)
 - With `--dry-run`, steps are printed but never executed (no `--allow-shell`
-  needed).
+  needed); native verbs preview their targets without changing anything.
+- A `shell:` step is always external, even if its text matches a verb name.
 - A custom command whose name collides with a built-in is skipped with a
   warning, so it can never shadow `container`, `image`, etc.
-
-> The scalar vs. `shell:` distinction is intentional: scalar steps are
-> reserved for future **SDK-native toolbox verbs** that will run common
-> workflows without `--allow-shell`. See the [Roadmap](#roadmap).
+- The Docker engine is connected **lazily** — a workflow made entirely of
+  `shell:` steps runs even when Docker is unreachable.
 
 ## Architecture
 
@@ -252,8 +280,15 @@ Docker, and only one package shells out.**
 
 - `internal/engine` is the *only* package that calls the Docker SDK. All
   built-in commands go through it and never shell out.
+- `internal/ops` holds the built-in operations (list, bulk remove, prune,
+  reset, …) as a single implementation shared by both the CLI commands and the
+  native custom-command verbs. It talks to Docker only via `engine.API`.
 - `internal/executor` is the *only* place that runs external commands, and only
   for user-defined custom workflows (gated by `--allow-shell`).
+
+Because command logic depends on the `engine.API` interface rather than the
+concrete client, `ops` and `executor` are exercised in tests against an
+in-memory fake (`internal/enginetest`) with no Docker daemon required.
 
 This keeps the Docker boundary and the "runs arbitrary commands" boundary
 separate and easy to audit.
@@ -266,9 +301,11 @@ dockerToolBox/
 │   └── dockertoolbox/
 │       └── main.go          # thin entry point (plugin-ready)
 ├── internal/
-│   ├── commands/            # Cobra command tree + safety helpers
+│   ├── commands/            # Cobra command tree (thin; delegates to ops)
 │   ├── engine/              # the ONLY package that calls the Docker SDK
-│   ├── executor/            # runs user-defined custom-command steps
+│   ├── ops/                 # built-in operations, shared by CLI and verbs
+│   ├── executor/            # runs custom-command steps (native verbs + shell)
+│   ├── enginetest/          # in-memory fake engine.API for tests
 │   ├── config/              # loads ~/.docker-toolbox/config.yaml
 │   └── ui/                  # styled terminal output (ANSI)
 ├── examples/
@@ -312,8 +349,8 @@ keeps output to plain ANSI so the binary stays lean.
 | Version | Focus |
 | ------- | ----- |
 | **0.1** | Standalone CLI, Docker API connection, built-in commands, global safety flags, custom commands |
-| **0.2** *(current)* | Resource listing (`ls`), network commands, `system prune`/`system df`, and `--name`/`--label` selectors |
-| **0.3** | Docker CLI plugin entry point (`docker toolbox …`); SDK-native custom-command verbs; variables and hooks |
+| **0.2** | Resource listing (`ls`), network commands, `system prune`/`system df`, and `--name`/`--label` selectors |
+| **0.3** *(current)* | Docker CLI plugin entry point (`docker toolbox …`); SDK-native custom-command verbs; signal-aware cancellation; `engine.API` seam + fake for testable command logic. *(Variables and hooks deferred to 0.3.x.)* |
 | **0.4** | Interactive terminal UI (Bubble Tea / Lip Gloss) |
 | **1.0** | Plugin ecosystem |
 
