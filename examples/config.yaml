@@ -1,22 +1,40 @@
 # Example DockerToolBox user config.
 # Copy to ~/.docker-toolbox/config.yaml to enable these commands.
 #
-# In v0.1, custom steps run as external shell commands and therefore
-# require the global --allow-shell flag, e.g.:
-#
-#     dockertoolbox deploy-dev --allow-shell
-#     dockertoolbox deploy-dev --dry-run     # preview, no --allow-shell needed
-#
-# A step may be a plain string or an explicit shell step:
+# A step may be a plain string (scalar) or an explicit shell step:
 #
 #     steps:
-#       - docker compose up -d            # scalar form
+#       - container rm-all                # scalar form
 #       - shell: "docker compose logs -f" # explicit shell form
+#
+# How a scalar step runs depends on whether it names a native verb:
+#
+#   - If it matches a built-in verb (e.g. `container rm-all`, `image clean`,
+#     `system prune`), it runs through the Docker engine directly — no shell,
+#     no --allow-shell needed. It follows the same list -> confirm -> act
+#     safety flow as the equivalent CLI command, and honors --dry-run/--yes.
+#
+#   - Otherwise it is treated as an external shell command and requires the
+#     global --allow-shell flag, e.g.:
+#
+#         dockertoolbox deploy-dev --allow-shell
+#         dockertoolbox deploy-dev --dry-run     # preview, no --allow-shell needed
+#
+# A `shell:` step is ALWAYS external, even if its text matches a verb name.
 
 commands:
+  # All native verbs — runs with no --allow-shell.
+  nuke-dev:
+    description: Tear down the dev environment safely
+    steps:
+      - container rm-all      # native verb: stop + remove every container
+      - image clean           # native verb: prune dangling images
+      - volume clean          # native verb: prune unused volumes
+
+  # Mix of native verbs and explicit shell steps (needs --allow-shell).
   deploy-dev:
     description: Deploy development environment
     steps:
-      - docker compose down
-      - docker compose pull
-      - docker compose up -d
+      - container rm-all              # native verb (safe)
+      - shell: docker compose pull    # external
+      - shell: docker compose up -d   # external

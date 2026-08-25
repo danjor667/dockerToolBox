@@ -1,4 +1,4 @@
-package commands
+package ops
 
 import (
 	"fmt"
@@ -13,6 +13,14 @@ func shortID(id string) string {
 		return id[:12]
 	}
 	return id
+}
+
+// nameOr returns name, or "-" when it is empty (for table cells).
+func nameOr(name string) string {
+	if name == "" {
+		return "-"
+	}
+	return name
 }
 
 // containerLabel renders a container for display.
@@ -45,14 +53,6 @@ func imageLabels(ims []engine.Image) []string {
 		out[i] = imageLabel(im)
 	}
 	return out
-}
-
-// nameOr returns name, or "-" when it is empty (for table cells).
-func nameOr(name string) string {
-	if name == "" {
-		return "-"
-	}
-	return name
 }
 
 // humanSizeI formats a signed byte count, treating negatives as zero.
